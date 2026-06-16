@@ -16,7 +16,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const {NotifPermission} = NativeModules;
-const BACKEND_URL = 'https://do.velsat.pe:8443/notify/yape';
 
 interface Config {
   empresaRuc: string;

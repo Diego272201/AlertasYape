@@ -34,4 +34,13 @@ class NotifPermissionModule(private val reactContext: ReactApplicationContext) :
             .putString("sucursalId", sucursalId)
             .apply()
     }
+
+    @ReactMethod
+    fun getConfig(promise: Promise) {
+        val prefs = reactContext.getSharedPreferences("factufly_config", Context.MODE_PRIVATE)
+        val map = com.facebook.react.bridge.Arguments.createMap()
+        map.putString("empresaRuc", prefs.getString("empresaRuc", "") ?: "")
+        map.putString("sucursalId", prefs.getString("sucursalId", "") ?: "")
+        promise.resolve(map)
+    }
 }

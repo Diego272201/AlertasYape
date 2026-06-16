@@ -13,7 +13,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const {NotifPermission} = NativeModules;
 
@@ -114,10 +113,10 @@ export default function App() {
     setAuthorized(granted);
   };
 
-  // Cargar config guardada
+  // Cargar config guardada desde SharedPreferences
   useEffect(() => {
-    AsyncStorage.getItem('factufly_config').then(val => {
-      if (val) setConfig(JSON.parse(val));
+    NotifPermission.getConfig().then((val: Config) => {
+      if (val.empresaRuc) setConfig(val);
     });
   }, []);
 
@@ -136,8 +135,7 @@ export default function App() {
     }
   }, [authorized, config]);
 
-  const handleSaveConfig = async (c: Config) => {
-    await AsyncStorage.setItem('factufly_config', JSON.stringify(c));
+  const handleSaveConfig = (c: Config) => {
     NotifPermission.saveConfig(c.empresaRuc, c.sucursalId);
     setConfig(c);
     setEditando(false);
@@ -148,8 +146,8 @@ export default function App() {
       {text: 'Cancelar', style: 'cancel'},
       {
         text: 'Sí, cambiar',
-        onPress: async () => {
-          await AsyncStorage.removeItem('factufly_config');
+        onPress: () => {
+          NotifPermission.saveConfig('', '');
           setConfig(null);
           setEditando(true);
         },

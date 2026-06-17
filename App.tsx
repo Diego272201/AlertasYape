@@ -128,6 +128,7 @@ function SetupScreen({onSave}: {onSave: (c: Config) => void}) {
 export default function App() {
   const [config, setConfig] = useState<Config | null>(null);
   const [authorized, setAuthorized] = useState(false);
+  const [batteryOk, setBatteryOk] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [editando, setEditando] = useState(false);
 
@@ -142,6 +143,8 @@ export default function App() {
   const checkPermission = async () => {
     const granted = await NotifPermission.isGranted();
     setAuthorized(granted);
+    const battIgnored = await NotifPermission.isBatteryOptimizationIgnored();
+    setBatteryOk(battIgnored);
   };
 
   // Cargar config guardada desde SharedPreferences
@@ -238,6 +241,16 @@ export default function App() {
         <TouchableOpacity style={styles.btnPermiso} onPress={requestPermission}>
           <Text style={styles.btnPermisoText}>
             Activar acceso a notificaciones
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {!batteryOk && (
+        <TouchableOpacity
+          style={[styles.btnPermiso, {backgroundColor: '#e67e00', marginTop: 0}]}
+          onPress={() => NotifPermission.requestIgnoreBatteryOptimization()}>
+          <Text style={styles.btnPermisoText}>
+            Desactivar optimización de batería
           </Text>
         </TouchableOpacity>
       )}

@@ -2,6 +2,7 @@ package com.yapelistener
 
 import android.app.Notification
 import android.content.Context
+import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -70,6 +71,14 @@ class YapeNotificationService : NotificationListenerService() {
     private fun postToBackend(title: String, body: String, pago: YapePago) {
         val (empresaRuc, sucursalId) = getConfig()
 
+        // WakeLock: mantiene el CPU activo aunque la pantalla esté apagada (Doze mode)
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val wakeLock = pm.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "FactuFlyAlertas::YapePost"
+        )
+        wakeLock.acquire(15_000L) // máximo 15 seg, se libera antes al terminar
+
         Thread {
             try {
                 val url = URL(BACKEND_URL)
@@ -90,6 +99,8 @@ class YapeNotificationService : NotificationListenerService() {
                 conn.disconnect()
             } catch (e: Exception) {
                 Log.e("YapeListener", "Error POST: ${e.message}")
+            } finally {
+                if (wakeLock.isHeld) wakeLock.release()
             }
         }.start()
     }

@@ -1,7 +1,10 @@
 package com.yapelistener
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.os.Build
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -15,6 +18,8 @@ class YapeNotificationService : NotificationListenerService() {
         private const val YAPE_PACKAGE = "com.bcp.innovacxion.yapeapp"
         private const val BACKEND_URL = "https://do.velsat.pe:8443/notify/yape"
         private const val PREFS_NAME = "factufly_config"
+        private const val CHANNEL_ID = "factufly_alertas_channel"
+        private const val FOREGROUND_NOTIF_ID = 1001
     }
 
     data class YapePago(val monto: Double, val remitente: String, val codigoSeguridad: String)
@@ -22,6 +27,39 @@ class YapeNotificationService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.d("YapeListener", "Servicio conectado ✓")
+        startForegroundService()
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+    }
+
+    private fun startForegroundService() {
+        // Crear canal (Android 8+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "FactuFly Alertas",
+                // IMPORTANCE_MIN = sin sonido, sin icono en barra de estado, colapsada al fondo
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = "Servicio activo escuchando pagos Yape"
+                setShowBadge(false)
+            }
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(channel)
+        }
+
+        val notif = Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle("FactuFly Alertas activo")
+            .setContentText("Escuchando pagos Yape en segundo plano")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(Notification.PRIORITY_MIN)
+            .setOngoing(true)
+            .build()
+
+        startForeground(FOREGROUND_NOTIF_ID, notif)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {

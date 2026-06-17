@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,12 @@ import {
   StatusBar,
   Platform,
   NativeModules,
-  TextInput,
-  KeyboardAvoidingView,
 } from 'react-native';
+import {
+  Camera,
+  useCameraDevice,
+  useCodeScanner,
+} from 'react-native-vision-camera';
 
 const {NotifPermission} = NativeModules;
 
@@ -28,27 +31,46 @@ interface LogEntry {
   time: string;
 }
 
-// ─── Pantalla de configuración ────────────────────────────────────────────────
+// ─── Pantalla de escaneo QR ───────────────────────────────────────────────────
 function SetupScreen({onSave}: {onSave: (c: Config) => void}) {
-  const [ruc, setRuc] = useState('');
-  const [sucursal, setSucursal] = useState('');
+  const [hasCamPerm, setHasCamPerm] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const device = useCameraDevice('back');
 
-  const handleGuardar = () => {
-    if (ruc.trim().length < 8) {
-      Alert.alert('RUC inválido', 'Ingresa un RUC válido.');
-      return;
-    }
-    if (!sucursal.trim()) {
-      Alert.alert('Sucursal requerida', 'Ingresa el ID de sucursal.');
-      return;
-    }
-    onSave({empresaRuc: ruc.trim(), sucursalId: sucursal.trim()});
-  };
+  useEffect(() => {
+    Camera.requestCameraPermission().then(status => {
+      setHasCamPerm(status === 'granted');
+    });
+  }, []);
+
+  const codeScanner = useCodeScanner({
+    codeTypes: ['qr'],
+    onCodeScanned: useCallback(
+      (codes: any[]) => {
+        if (scanned || codes.length === 0) return;
+        const value = codes[0].value ?? '';
+        try {
+          // QR esperado: {"empresaRuc":"20123456789","sucursalId":"3"}
+          const parsed = JSON.parse(value);
+          if (!parsed.empresaRuc || !parsed.sucursalId) throw new Error();
+          setScanned(true);
+          onSave({
+            empresaRuc: String(parsed.empresaRuc),
+            sucursalId: String(parsed.sucursalId),
+          });
+        } catch {
+          Alert.alert(
+            'QR inválido',
+            'El código QR no es de FactuFly. Inténtalo de nuevo.',
+          );
+        }
+      },
+      [scanned, onSave],
+    ),
+  });
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={styles.container}>
       <StatusBar backgroundColor="#6D1FCA" barStyle="light-content" />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>FactuFly Alertas</Text>
@@ -56,40 +78,49 @@ function SetupScreen({onSave}: {onSave: (c: Config) => void}) {
       </View>
 
       <View style={styles.setupCard}>
-        <Text style={styles.setupTitle}>Conecta tu empresa</Text>
+        <Text style={styles.setupTitle}>Escanea el QR de tu empresa</Text>
         <Text style={styles.setupDesc}>
-          Ingresa los datos de tu empresa en FactuFly para recibir las alertas
-          de Yape correctamente.
+          Inicia sesión en FactuFly desde el navegador y escanea el código QR
+          que aparece en tu perfil.
         </Text>
-
-        <Text style={styles.label}>RUC de la empresa</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej: 20123456789"
-          placeholderTextColor="#94a3b8"
-          keyboardType="numeric"
-          maxLength={11}
-          value={ruc}
-          onChangeText={setRuc}
-        />
-
-        <Text style={styles.label}>ID de Sucursal</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej: 3"
-          placeholderTextColor="#94a3b8"
-          keyboardType="numeric"
-          value={sucursal}
-          onChangeText={setSucursal}
-        />
-
-        <TouchableOpacity
-          style={[styles.btnPermiso, {marginTop: 8}]}
-          onPress={handleGuardar}>
-          <Text style={styles.btnPermisoText}>Guardar y continuar</Text>
-        </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+
+      {/* Visor QR */}
+      {!hasCamPerm ? (
+        <View style={styles.camPlaceholder}>
+          <Text style={styles.camPlaceholderText}>
+            Se necesita permiso de cámara
+          </Text>
+          <TouchableOpacity
+            style={[styles.btnPermiso, {marginTop: 12, marginHorizontal: 0}]}
+            onPress={() =>
+              Camera.requestCameraPermission().then(s =>
+                setHasCamPerm(s === 'granted'),
+              )
+            }>
+            <Text style={styles.btnPermisoText}>Permitir cámara</Text>
+          </TouchableOpacity>
+        </View>
+      ) : device ? (
+        <View style={styles.camContainer}>
+          <Camera
+            style={StyleSheet.absoluteFill}
+            device={device}
+            isActive={!scanned}
+            codeScanner={codeScanner}
+          />
+          {/* Marco de enfoque */}
+          <View style={styles.camOverlay}>
+            <View style={styles.camFrame} />
+            <Text style={styles.camHint}>Apunta al código QR de FactuFly</Text>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.camPlaceholder}>
+          <Text style={styles.camPlaceholderText}>Cámara no disponible</Text>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -131,7 +162,10 @@ export default function App() {
   useEffect(() => {
     if (authorized && config) {
       addLog('Servicio activo — escuchando Yape en background', 'success');
-      addLog(`Empresa RUC: ${config.empresaRuc} | Sucursal: ${config.sucursalId}`, 'info');
+      addLog(
+        `Empresa RUC: ${config.empresaRuc} | Sucursal: ${config.sucursalId}`,
+        'info',
+      );
     }
   }, [authorized, config]);
 
@@ -182,7 +216,12 @@ export default function App() {
 
       {/* Estado */}
       <View style={styles.statusCard}>
-        <View style={[styles.dot, authorized ? styles.dotActive : styles.dotInactive]} />
+        <View
+          style={[
+            styles.dot,
+            authorized ? styles.dotActive : styles.dotInactive,
+          ]}
+        />
         <View style={{flex: 1}}>
           <Text style={styles.statusTitle}>
             {authorized ? 'Escuchando en background' : 'Permiso requerido'}
@@ -197,7 +236,9 @@ export default function App() {
 
       {!authorized && (
         <TouchableOpacity style={styles.btnPermiso} onPress={requestPermission}>
-          <Text style={styles.btnPermisoText}>Activar acceso a notificaciones</Text>
+          <Text style={styles.btnPermisoText}>
+            Activar acceso a notificaciones
+          </Text>
         </TouchableOpacity>
       )}
 
@@ -205,7 +246,9 @@ export default function App() {
       <View style={styles.infoBox}>
         <View style={{flex: 1}}>
           <Text style={styles.infoLabel}>EMPRESA</Text>
-          <Text style={styles.infoValue}>RUC {config.empresaRuc} · Sucursal {config.sucursalId}</Text>
+          <Text style={styles.infoValue}>
+            RUC {config.empresaRuc} · Sucursal {config.sucursalId}
+          </Text>
         </View>
         <TouchableOpacity onPress={handleReset}>
           <Text style={styles.linkCambiar}>Cambiar</Text>
@@ -234,7 +277,9 @@ export default function App() {
         )}
       </ScrollView>
 
-      <Text style={styles.nota}>El servicio funciona aunque la app esté cerrada</Text>
+      <Text style={styles.nota}>
+        El servicio funciona aunque la app esté cerrada
+      </Text>
     </View>
   );
 }
@@ -258,20 +303,53 @@ const styles = StyleSheet.create({
     borderColor: '#E2EAF6',
     elevation: 2,
   },
-  setupTitle: {fontSize: 17, fontWeight: '700', color: '#0f2e64', marginBottom: 6},
-  setupDesc: {fontSize: 13, color: '#94a3b8', marginBottom: 20, lineHeight: 18},
-  label: {fontSize: 12, fontWeight: '600', color: '#0f2e64', marginBottom: 6},
-  input: {
-    borderWidth: 1,
-    borderColor: '#D9E4F5',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
+  setupTitle: {
+    fontSize: 17,
+    fontWeight: '700',
     color: '#0f2e64',
-    marginBottom: 16,
-    backgroundColor: '#f8faff',
+    marginBottom: 6,
   },
+  setupDesc: {fontSize: 13, color: '#94a3b8', lineHeight: 18},
+  camContainer: {
+    flex: 1,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  camOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  camFrame: {
+    width: 220,
+    height: 220,
+    borderWidth: 3,
+    borderColor: '#6D1FCA',
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+  },
+  camHint: {
+    marginTop: 16,
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 4,
+  },
+  camPlaceholder: {
+    flex: 1,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    backgroundColor: '#1e293b',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  camPlaceholderText: {color: '#94a3b8', fontSize: 14, textAlign: 'center'},
   statusCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -328,11 +406,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
   },
-  logEmpty: {color: '#475569', fontSize: 13, textAlign: 'center', marginTop: 20},
+  logEmpty: {
+    color: '#475569',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 20,
+  },
   logRow: {marginBottom: 6},
   logTime: {fontSize: 10, color: '#475569'},
   logText: {fontSize: 12, color: '#cbd5e1', lineHeight: 18},
   logSuccess: {color: '#4ade80'},
   logError: {color: '#f87171'},
-  nota: {textAlign: 'center', fontSize: 11, color: '#94a3b8', marginVertical: 12},
+  nota: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: '#94a3b8',
+    marginVertical: 12,
+  },
 });

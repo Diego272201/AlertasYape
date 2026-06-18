@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -23,6 +24,7 @@
         android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
         android:launchMode="singleTask"
         android:windowSoftInputMode="adjustResize"
+        android:theme="@style/SplashTheme"
         android:exported="true">
         <intent-filter>
           <action android:name="android.intent.action.MAIN" />
@@ -34,14 +36,11 @@
         android:name=".YapeNotificationService"
         android:label="FactuFly Alertas"
         android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-        android:foregroundServiceType="specialUse"
+        android:foregroundServiceType="dataSync"
         android:exported="true">
         <intent-filter>
           <action android:name="android.service.notification.NotificationListenerService" />
         </intent-filter>
-        <property
-          android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-          android:value="Escucha notificaciones de pago Yape para enviarlas al sistema de facturación" />
       </service>
 
       <receiver

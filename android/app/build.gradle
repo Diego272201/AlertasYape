@@ -92,15 +92,25 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (project.hasProperty('FACTUFLY_UPLOAD_STORE_FILE')) {
+                storeFile file(FACTUFLY_UPLOAD_STORE_FILE)
+                storePassword FACTUFLY_UPLOAD_STORE_PASSWORD
+                keyAlias FACTUFLY_UPLOAD_KEY_ALIAS
+                keyPassword FACTUFLY_UPLOAD_KEY_PASSWORD
+                // v1 (JAR) + v2 para máxima compatibilidad con todas las ROMs
+                enableV1Signing true
+                enableV2Signing true
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Firmado con el keystore de release propio (factufly-release.keystore)
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

@@ -12,6 +12,9 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    // Cambia del tema de splash (SplashTheme) al tema normal de la app
+    // una vez que la actividad arranca. Debe ir ANTES de super.onCreate().
+    setTheme(R.style.AppTheme)
     super.onCreate(savedInstanceState)
     // Android 13+ exige permiso en runtime para mostrar CUALQUIER notificación,
     // incluida la del foreground service. Sin esto no se ve nada.
